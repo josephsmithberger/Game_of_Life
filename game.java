@@ -1,5 +1,5 @@
 public class game {
-    boolean[][] occupied;
+    boolean[][] boxes;
     public static void main(String[] args) {
         
     }
