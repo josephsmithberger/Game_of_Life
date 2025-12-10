@@ -1,6 +1,7 @@
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
+import javax.swing.event.*;
 
 public class game extends JFrame {
     boolean[][] boxes;
@@ -11,6 +12,7 @@ public class game extends JFrame {
     Timer timer;
     GridPanel gridPanel;
     JSlider speedSlider;
+    public Color cellColor = Color.WHITE;
     
     public game() {
         boxes = new boolean[GRID_SIZE][GRID_SIZE];
@@ -45,10 +47,111 @@ public class game extends JFrame {
         
         add(gridPanel, BorderLayout.CENTER);
         add(controls, BorderLayout.SOUTH);
-        
+
         pack();
         setLocationRelativeTo(null);
         setVisible(true);
+
+        //
+        // Menu at the top of the screen for color palette
+        //
+        // https://coderanch.com/t/332515/java/Color-Palette
+        // https://mathbits.com/JavaBitsNotebook/Graphics/Color.html
+        // https://www.geeksforgeeks.org/java/java-swing-jcolorchooser-class/#
+        //
+        JMenuBar menuBar = new JMenuBar();
+        JMenu optionsMenu = new JMenu("Options");
+        JMenu colorMenu = new JMenu("Color");
+        optionsMenu.add(colorMenu);
+        menuBar.add(optionsMenu);
+        setJMenuBar(menuBar);
+
+        // original palette (4x4)
+        Color[] paletteColors = new Color[]
+                {
+            Color.WHITE, Color.LIGHT_GRAY, Color.GRAY, Color.DARK_GRAY,
+            Color.BLACK, Color.RED, Color.ORANGE, Color.YELLOW,
+            Color.GREEN, Color.MAGENTA, Color.CYAN, Color.BLUE,
+            new Color(139,69,19), new Color(255,192,203), new Color(128,0,128), new Color(0,128,128)
+        };
+
+        JPopupMenu palettePopup = new JPopupMenu();
+        JPanel palettePanel = new JPanel(new GridLayout(4, 4, 4, 4));
+        palettePanel.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
+        palettePanel.setBackground(Color.WHITE);
+
+        Color[] lastHovered = new Color[1];
+
+        for (Color c : paletteColors)
+        {
+            JLabel swatch = new JLabel();
+            swatch.setOpaque(true);
+            swatch.setBackground(c);
+            swatch.setPreferredSize(new Dimension(24, 24));
+            swatch.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+
+            swatch.addMouseListener(new MouseAdapter()
+            {
+                @Override
+                public void mouseEntered(MouseEvent e)
+                {
+                    lastHovered[0] = c;
+                    cellColor = c;
+                    gridPanel.repaint();
+                }
+
+                @Override
+                public void mousePressed(MouseEvent e)
+                {
+                    cellColor = c;
+                    gridPanel.repaint();
+                    palettePopup.setVisible(false);
+                }
+
+                @Override
+                public void mouseReleased(MouseEvent e)
+                {
+                    if (lastHovered[0] != null)
+                    {
+                        cellColor = lastHovered[0];
+                        gridPanel.repaint();
+                        palettePopup.setVisible(false);
+                    }
+                }
+            });
+
+            palettePanel.add(swatch);
+        }
+
+        palettePopup.add(palettePanel);
+
+        // Show/hide the palette when the menu is opened/closed
+        colorMenu.addMenuListener(new MenuListener() {
+            @Override public void menuSelected(MenuEvent e) {
+                int x = colorMenu.getX();
+                int y = colorMenu.getY() + colorMenu.getHeight();
+                palettePopup.show(menuBar, x, y);
+            }
+            @Override public void menuDeselected(MenuEvent e) { palettePopup.setVisible(false); }
+            @Override public void menuCanceled(MenuEvent e) { palettePopup.setVisible(false); }
+        });
+
+        // Add a "Custom..." item to open a full JColorChooser dialog with live preview
+        JMenuItem customItem = new JMenuItem("custom");
+        customItem.addActionListener(ae -> {
+            final Color previous = cellColor;
+            final JColorChooser chooser = new JColorChooser(cellColor);
+            chooser.getSelectionModel().addChangeListener(e -> {
+                cellColor = chooser.getColor();
+                gridPanel.repaint();
+            });
+            JDialog dialog = JColorChooser.createDialog(this, "Custom Color", true, chooser,
+                ok -> { /* OK: color already set */ },
+                cancel -> { cellColor = previous; gridPanel.repaint(); }
+            );
+            dialog.setVisible(true);
+        });
+        colorMenu.add(customItem);
     }
     
     // Custom panel for drawing the grid
@@ -86,8 +189,9 @@ public class game extends JFrame {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-            g.setColor(Color.WHITE);
-            
+            // check diff!
+            g.setColor(cellColor);
+
             // Only draw alive cells
             for (int i = 0; i < GRID_SIZE; i++) {
                 for (int j = 0; j < GRID_SIZE; j++) {
@@ -98,7 +202,7 @@ public class game extends JFrame {
             }
         }
     }
-    
+
     void play() {
         if (timer == null) timer = new Timer(speedSlider.getValue(), e -> updateGeneration());
         timer.start();
